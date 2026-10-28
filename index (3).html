@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Interactive simulator: why the Crss/Ciss ratio sets a MOSFET's dV/dt noise tolerance, with animated Miller self turn-on, SW node scope and shoot-through loss calculation.">
+<meta name="author" content="Warayut Machima">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Self Turn-On Simulator: Why the Crss/Ciss ratio matters">
+<meta property="og:description" content="Interactive simulator: why the Crss/Ciss ratio sets a MOSFET's dV/dt noise tolerance, with animated Miller self turn-on, SW node scope and shoot-through loss calculation.">
+<meta property="og:url" content="https://warayutmachima007-hash.github.io/self-turn-on-sim/">
+<meta property="og:image" content="https://warayutmachima007-hash.github.io/self-turn-on-sim/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta name="twitter:card" content="summary_large_image">
+<title>Self Turn-On Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one bench — controls left, live leg + scope right, one-line verdict on top */
+:root{
+  --bg:#eef2f5; --panel:#ffffff; --ink:#0f2236; --muted:#5a6b7d; --line:#d3dce5;
+  --navy:#16324f; --teal:#0f8b8d; --amber:#c9781a; --red:#c2412d; --green:#2f8a4e;
+  --grid:rgba(22,50,79,.09);
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1622; --panel:#13202f; --ink:#e3ebf3; --muted:#93a4b6; --line:#25384c;
+  --navy:#8fb4d9; --teal:#3cc4c2; --amber:#e6a04a; --red:#ef6e57; --green:#5cc07c;
+  --grid:rgba(143,180,217,.10); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1622; --panel:#13202f; --ink:#e3ebf3; --muted:#93a4b6; --line:#25384c;
+  --navy:#8fb4d9; --teal:#3cc4c2; --amber:#e6a04a; --red:#ef6e57; --green:#5cc07c;
+  --grid:rgba(143,180,217,.10); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--f-display);font-weight:700;font-size:2rem;margin:0;color:var(--navy)}
+.lede{margin:2px 0 0;color:var(--muted);max-width:75ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px}
+.label{font-family:var(--f-display);font-weight:600;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.top{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+@media (max-width:900px){.top{grid-template-columns:repeat(2,minmax(0,1fr))}.top .verdict{grid-column:1/-1}}
+.top>div{background:var(--panel);padding:12px 14px;min-width:0}
+.k{font-family:var(--f-display);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.v{font-family:var(--f-mono);font-size:1.3rem;font-weight:500;font-variant-numeric:tabular-nums}
+.sub{font-size:.78rem;color:var(--muted)}
+.pill{display:inline-block;font:600 .8rem var(--f-display);letter-spacing:.1em;text-transform:uppercase;padding:3px 10px;border-radius:999px;color:#fff;margin-bottom:4px}
+.pill.ok{background:var(--green)}.pill.warn{background:var(--amber)}.pill.bad{background:var(--red)}
+.verdict p{margin:0;font-size:.88rem}
+.main{display:grid;grid-template-columns:290px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.rack{display:flex;flex-direction:column;gap:12px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:0 8px;align-items:center}
+.ctl label{font-size:.88rem}
+.ctl output{font-family:var(--f-mono);font-size:.84rem;font-variant-numeric:tabular-nums;color:var(--navy)}
+.ctl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--teal)}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+button{font:500 .82rem var(--f-body);border:1px solid var(--line);background:transparent;color:var(--ink);padding:5px 10px;border-radius:4px;cursor:pointer}
+button:hover{border-color:var(--teal)}
+button.on{background:var(--navy);color:var(--panel);border-color:var(--navy)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-family:var(--f-display);font-weight:600;font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+details[open] summary{margin-bottom:10px}
+details .rack{gap:10px}
+.chk{display:flex;gap:8px;align-items:center;font-size:.88rem}
+.note{font-size:.78rem;color:var(--muted);margin:0}
+.bench{display:flex;flex-direction:column;gap:12px;min-width:0}
+.play{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.play input{flex:1;min-width:160px;accent-color:var(--teal)}
+.now{font-family:var(--f-mono);font-size:.85rem;font-variant-numeric:tabular-nums;color:var(--muted)}
+.now b{color:var(--red);font-weight:500}
+.legs{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:center}
+@media (max-width:1000px){.legs{grid-template-columns:minmax(0,1fr)}}
+#hb{width:100%;height:auto;display:block;max-width:560px;margin:0 auto}
+#hb .t{font-family:var(--f-mono);font-size:12px;fill:var(--ink)}
+#hb .s{font-size:10.5px;fill:var(--muted)}
+.scope{position:relative;height:340px}
+@keyframes flow{to{stroke-dashoffset:-28}}
+#hb-st.run{animation:flow .5s linear infinite}
+.idea{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:800px){.idea{grid-template-columns:minmax(0,1fr)}}
+.idea p{margin:0;font-size:.9rem}
+.idea b{display:block;font-family:var(--f-display);font-size:1.05rem;color:var(--navy);margin-bottom:2px}
+.f{font-family:var(--f-mono);font-size:.85rem;color:var(--teal)}
+@media (prefers-reduced-motion:reduce){#hb-st.run{animation:none}}
+.calc{display:flex;flex-direction:column;gap:10px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+@media (max-width:900px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.steps{grid-template-columns:minmax(0,1fr)}}
+.step{background:var(--panel);padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.step .n{font-family:var(--f-display);font-weight:600;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.step .eqn{font-family:var(--f-mono);font-size:.82rem;color:var(--teal);overflow-wrap:anywhere}
+.step .res{font-family:var(--f-mono);font-size:1.2rem;font-weight:500;font-variant-numeric:tabular-nums}
+.step .why{font-size:.8rem;color:var(--muted)}
+.calc.hot .res{color:var(--red)}
+</style>
+
+<style>body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Self Turn-On Simulator</h1>
+    <p class="lede">The high-side switch turns on and the switch node jumps. Current through C<sub>GD</sub> lifts the low-side gate. If it crosses V<sub>th</sub>, both switches conduct at once. Press <b>Play</b>.</p>
+  </header>
+
+  <div class="top">
+    <div class="verdict"><span class="pill ok" id="pill">Safe</span><p id="vtext"></p></div>
+    <div><div class="k">C<sub>rss</sub>/C<sub>iss</sub></div><div class="v" id="r-ratio"></div><div class="sub" id="r-ceil"></div></div>
+    <div><div class="k">Peak V<sub>GS</sub></div><div class="v" id="r-peak"></div><div class="sub" id="r-vth"></div></div>
+    <div><div class="k">Shoot-through</div><div class="v" id="r-ipk"></div><div class="sub" id="r-ton"></div></div>
+    <div><div class="k">Extra loss</div><div class="v" id="r-p"></div><div class="sub" id="r-e"></div></div>
+  </div>
+
+  <div class="main">
+    <aside class="panel rack" aria-label="Parameters">
+      <div><p class="label">Preset (illustrative)</p><div class="presets" id="presets"></div></div>
+      <div class="ctl"><label for="dvdt">dV/dt (V/ns)</label><output id="o-dvdt"></output><input type="range" id="dvdt" min="1" max="200" step="1"></div>
+      <div class="ctl"><label for="vbus">Bus voltage (V)</label><output id="o-vbus"></output><input type="range" id="vbus" min="12" max="1000" step="1"></div>
+      <div class="ctl"><label for="ciss">C<sub>iss</sub> (pF)</label><output id="o-ciss"></output><input type="range" id="ciss" min="100" max="10000" step="10"></div>
+      <div class="ctl"><label for="crss">C<sub>rss</sub> (pF)</label><output id="o-crss"></output><input type="range" id="crss" min="0.5" max="150" step="0.5"></div>
+      <div class="ctl"><label for="rg">Gate-off resistance R<sub>G,off</sub> (Ω)</label><output id="o-rg"></output><input type="range" id="rg" min="0.2" max="30" step="0.1"></div>
+      <div class="ctl"><label for="voff">Off bias V<sub>GS,off</sub> (V)</label><output id="o-voff"></output><input type="range" id="voff" min="-6" max="0" step="0.5"></div>
+      <div class="ctl"><label for="vth">V<sub>th</sub> at 25 °C (V)</label><output id="o-vth"></output><input type="range" id="vth" min="0.8" max="5" step="0.05"></div>
+      <details>
+        <summary>Advanced</summary>
+        <div class="rack">
+          <div class="ctl"><label for="tj">T<sub>j</sub> (°C)</label><output id="o-tj"></output><input type="range" id="tj" min="25" max="175" step="5"></div>
+          <div class="ctl"><label for="tc">V<sub>th</sub> tempco (mV/°C)</label><output id="o-tc"></output><input type="range" id="tc" min="-10" max="0" step="0.5"></div>
+          <div class="ctl"><label for="knl">Low-V C<sub>rss</sub> rise (×)</label><output id="o-knl"></output><input type="range" id="knl" min="0" max="100" step="1"></div>
+          <div class="ctl"><label for="cgx">External C<sub>GS</sub> (pF)</label><output id="o-cgx"></output><input type="range" id="cgx" min="0" max="10000" step="50"></div>
+          <div class="ctl"><label for="gfs">g<sub>fs</sub> (S)</label><output id="o-gfs"></output><input type="range" id="gfs" min="1" max="200" step="1"></div>
+          <div class="ctl"><label for="fsw">f<sub>sw</sub> (kHz)</label><output id="o-fsw"></output><input type="range" id="fsw" min="10" max="1000" step="10"></div>
+          <label class="chk"><input type="checkbox" id="clamp"> Active Miller clamp</label>
+          <p class="note">C<sub>rss</sub>(V) = C<sub>rss</sub>·(1 + K·e<sup>−V/20V</sup>). I<sub>D</sub> = g<sub>fs</sub>·(V<sub>GS</sub> − V<sub>th</sub>). Not modeled: source and loop inductance.</p>
+        </div>
+      </details>
+    </aside>
+
+    <section class="panel bench">
+      <div class="play">
+        <button type="button" id="play">▶ Play</button>
+        <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="Scrub through the switching event">
+      </div>
+      <div class="now" id="now"></div>
+      <div class="legs">
+        <svg viewBox="0 0 540 330" role="img" aria-label="Half-bridge leg of two N-channel MOSFETs with body diodes and parasitic capacitances, showing shoot-through during self turn-on" id="hb">
+            <g stroke="var(--ink)" stroke-width="1.6" fill="none">
+              <path d="M220 20H380"/><path d="M300 20V30"/>
+              <path d="M300 150V180"/><path d="M300 165H470"/><path d="M470 157v16"/>
+              <path d="M300 300V312"/><path d="M220 312H380"/>
+              <path d="M186 240H210"/><path d="M150 232h36v16h-36z"/><path d="M110 240H150"/><path d="M110 232v16"/>
+            </g>
+            <path id="hb-st" d="M300 20V65H280V115H300V215H280V265H300V312" stroke="var(--red)" stroke-width="0" stroke-dasharray="8 6" fill="none" opacity="0" stroke-linejoin="round"/>
+            <g stroke="var(--ink)" stroke-width="1.6" fill="none"><path d="M300 30V65H280"/><path d="M280 115H300V150"/><path d="M288 90H300V115"/><path d="M270 60V120"/><path d="M270 90H210"/></g>
+<polygon points="281,90 290,85 290,95" fill="var(--ink)"/>
+<g id="qh-ch" stroke="var(--ink)" stroke-width="3"><path d="M280 57V73"/><path d="M280 82V98"/><path d="M280 107V123"/></g>
+<g id="qh-d" stroke="var(--ink)" stroke-width="1.6" fill="none"><path d="M300 42H330V84"/><path d="M321 84H339"/><path d="M330 102V138H300"/><polygon points="322,102 338,102 330,85" fill="var(--ink)" stroke="none"/></g>
+<g id="qh-cds" stroke="var(--muted)" stroke-width="1.4" fill="none" stroke-dasharray="4 3"><path d="M330 42H362V86"/><path d="M352 86H372" stroke-dasharray="none" stroke-width="2.2"/><path d="M352 94H372" stroke-dasharray="none" stroke-width="2.2"/><path d="M362 94V138H330"/></g>
+<g id="qh-cgd" stroke="var(--muted)" stroke-width="1.4" fill="none" stroke-dasharray="4 3"><path d="M245 90V63"/><path d="M235 63H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M235 57H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M245 57V36H300"/></g>
+<g id="qh-cgs" stroke="var(--muted)" stroke-width="1.4" fill="none" stroke-dasharray="4 3"><path d="M245 90V117"/><path d="M235 117H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M235 123H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M245 123V144H300"/></g>
+<circle cx="245" cy="90" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="36" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="42" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="138" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="144" r="2.4" fill="var(--ink)"/>
+<text x="230" y="64" class="t s" text-anchor="end">C_GD</text>
+<text x="230" y="126" class="t s" text-anchor="end">C_GS</text>
+<text x="376" y="94" class="t s">C_DS</text>
+<text x="324" y="120" class="t s" text-anchor="end" style="font-size:9px"></text>
+<text x="432" y="78" class="t" style="font-weight:500">Q_H</text>
+<text x="432" y="94" class="t s" id="qh-s">off</text>
+            <g stroke="var(--ink)" stroke-width="1.6" fill="none"><path d="M300 180V215H280"/><path d="M280 265H300V300"/><path d="M288 240H300V265"/><path d="M270 210V270"/><path d="M270 240H210"/></g>
+<polygon points="281,240 290,235 290,245" fill="var(--ink)"/>
+<g id="ql-ch" stroke="var(--ink)" stroke-width="3"><path d="M280 207V223"/><path d="M280 232V248"/><path d="M280 257V273"/></g>
+<g id="ql-d" stroke="var(--ink)" stroke-width="1.6" fill="none"><path d="M300 192H330V234"/><path d="M321 234H339"/><path d="M330 252V288H300"/><polygon points="322,252 338,252 330,235" fill="var(--ink)" stroke="none"/></g>
+<g id="ql-cds" stroke="var(--muted)" stroke-width="1.4" fill="none" stroke-dasharray="4 3"><path d="M330 192H362V236"/><path d="M352 236H372" stroke-dasharray="none" stroke-width="2.2"/><path d="M352 244H372" stroke-dasharray="none" stroke-width="2.2"/><path d="M362 244V288H330"/></g>
+<g id="ql-cgd" stroke="var(--muted)" stroke-width="1.4" fill="none" stroke-dasharray="4 3"><path d="M245 240V213"/><path d="M235 213H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M235 207H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M245 207V186H300"/></g>
+<g id="ql-cgs" stroke="var(--muted)" stroke-width="1.4" fill="none" stroke-dasharray="4 3"><path d="M245 240V267"/><path d="M235 267H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M235 273H255" stroke-dasharray="none" stroke-width="2.2"/><path d="M245 273V294H300"/></g>
+<circle cx="245" cy="240" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="186" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="192" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="288" r="2.4" fill="var(--ink)"/>
+<circle cx="300" cy="294" r="2.4" fill="var(--ink)"/>
+<text x="230" y="214" class="t s" text-anchor="end">C_GD</text>
+<text x="230" y="276" class="t s" text-anchor="end">C_GS</text>
+<text x="376" y="244" class="t s">C_DS</text>
+<text x="324" y="270" class="t s" text-anchor="end" style="font-size:9px"></text>
+<text x="432" y="228" class="t" style="font-weight:500">Q_L</text>
+<text x="432" y="244" class="t s" id="ql-s">off</text>
+            <text x="226" y="14" class="t">+V_bus</text><text x="226" y="326" class="t">0 V</text>
+            <text x="478" y="169" class="t">SW node</text>
+            <text x="205" y="94" class="t s" text-anchor="end">gate drive</text>
+            <text x="150" y="226" class="t s">R_G,off</text>
+            <text x="104" y="244" class="t s" text-anchor="end">V_off</text>
+            <text x="232" y="190" class="t" id="hb-mi" text-anchor="end" style="fill:var(--teal)" opacity="0">i = C_GD·dV/dt →</text>
+            <rect x="20" y="30" width="26" height="160" rx="3" fill="var(--bg)" stroke="var(--line)"/>
+            <rect id="hb-g" x="21" y="190" width="24" height="0" fill="var(--teal)"/>
+            <line id="hb-vth" x1="14" x2="52" y1="110" y2="110" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4 3"/>
+            <text x="56" y="114" class="t" id="hb-vth-t" style="fill:var(--amber)">V_th</text>
+            <text x="10" y="20" class="t">V_GS(Q_L)</text>
+            <text x="14" y="208" class="t" id="hb-g-t"></text>
+          </svg>
+        <div class="scope"><canvas id="cSw" aria-label="SW node voltage, low-side gate voltage and shoot-through current versus time"></canvas></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel calc" aria-label="Extra loss calculation">
+    <p class="label">Extra loss calculation · live from the sliders</p>
+    <div class="steps" id="calc"></div>
+    <p class="note" id="calc-note"></p>
+  </section>
+
+  <section class="panel idea">
+    <p><b>Ratio sets the ceiling</b>With the gate floating, the gate can rise by at most <span class="f">ΔV·C<sub>rss</sub>/C<sub>iss</sub></span>. If that stays below V<sub>th</sub> − V<sub>off</sub>, the device is immune at any dV/dt.</p>
+    <p><b>Driver sets how much you get</b>Below the ceiling, the bump ≈ <span class="f">C<sub>rss</sub>·dV/dt·R<sub>G</sub></span>. A lower R<sub>G,off</sub> or a Miller clamp drains the charge faster.</p>
+    <p><b>Check worst case</b>Use minimum V<sub>th</sub> at hot T<sub>j</sub>. A negative off bias adds margin directly.</p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const PRESETS={
+  "SR self turn-on":{ciss:6000,crss:60,knl:10,vbus:54,dvdt:15,rg:8,voff:0,cgx:0,vth:2.5,tj:125,tc:-5,fsw:200,gfs:80},
+  "SR + −2 V bias":{ciss:6000,crss:60,knl:10,vbus:54,dvdt:15,rg:8,voff:-2,cgx:0,vth:2.5,tj:125,tc:-5,fsw:200,gfs:80},
+  "650 V Si SJ":{ciss:2500,crss:5,knl:60,vbus:400,dvdt:50,rg:6,voff:0,cgx:0,vth:3.5,tj:125,tc:-6,fsw:100,gfs:15},
+  "1200 V SiC":{ciss:2000,crss:8,knl:15,vbus:800,dvdt:60,rg:5,voff:-4,cgx:0,vth:2.7,tj:150,tc:-4,fsw:100,gfs:10},
+  "650 V GaN":{ciss:250,crss:1.5,knl:5,vbus:400,dvdt:100,rg:2,voff:0,cgx:0,vth:1.5,tj:125,tc:-2,fsw:300,gfs:15}
+};
+const ids=["dvdt","vbus","ciss","crss","rg","voff","vth","tj","tc","knl","cgx","gfs","fsw"];
+const fmt={ciss:v=>v+" pF",crss:v=>v+" pF",knl:v=>v+"×",vbus:v=>v+" V",dvdt:v=>v+" V/ns",fsw:v=>v+" kHz",gfs:v=>v+" S",
+  rg:v=>(+v).toFixed(1)+" Ω",voff:v=>(+v).toFixed(1)+" V",cgx:v=>v+" pF",vth:v=>(+v).toFixed(2)+" V",tj:v=>v+" °C",tc:v=>(+v).toFixed(1)};
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function params(){const p={};ids.forEach(k=>p[k]=parseFloat($(k).value));p.clamp=$("clamp").checked;return p;}
+const crssV=(p,v)=>p.crss*1e-12*(1+p.knl*Math.exp(-Math.max(v,0)/20));
+const cgs=p=>Math.max((p.ciss-p.crss)*1e-12,1e-13)+p.cgx*1e-12;
+const vthT=p=>p.vth+p.tc*1e-3*(p.tj-25);
+const rEff=p=>p.clamp?Math.min(p.rg,0.3+Math.min(p.rg,1.0)):p.rg;
+
+// Gate node: (Cgs+Crss)·dVg/dt = Crss·dVd/dt − (Vg−Voff)/R ; I_D = gfs·(Vg−Vth) above threshold
+function simulate(p){
+  const R=rEff(p),Cg=cgs(p),slew=p.dvdt*1e9,tr=p.vbus/slew,tau=R*(Cg+crssV(p,p.vbus));
+  const tEnd=tr+Math.min(5*tau,3*tr)+tr*0.25,dt=Math.min(tr,tau)/400,th=vthT(p);
+  let t=0,vd=0,vg=p.voff,peak=vg,E=0,ipk=0,ton=0,vdPk=0;const o={t:[],vg:[],vd:[],id:[]};
+  const N=Math.ceil(tEnd/dt),stride=Math.max(1,Math.floor(N/600));
+  for(let i=0;i<=N;i++){
+    const dvd=t<tr?slew:0,cr=crssV(p,vd-vg);
+    const dvg=(cr*dvd-(vg-p.voff)/R)/(Cg+cr);
+    const id=vg>th?p.gfs*(vg-th):0;
+    if(id>0){E+=id*vd*dt;ton+=dt;if(id>ipk){ipk=id;vdPk=vd;}}
+    if(i%stride===0){o.t.push(t*1e9);o.vg.push(vg);o.vd.push(vd);o.id.push(id);}
+    vg+=dvg*dt;vd=Math.min(p.vbus,vd+dvd*dt);t+=dt;if(vg>peak)peak=vg;
+  }
+  return {peak,tr,E,ipk,ton,o,vdPk};
+}
+function ceiling(p){const Cg=cgs(p);let vg=p.voff,vd=0;const n=2000,dv=p.vbus/n;
+  for(let i=0;i<n;i++){const cr=crssV(p,vd-vg);vg+=cr/(Cg+cr)*dv;vd+=dv;}return vg-p.voff;}
+
+let cW=null,last=null,cursorIdx=0,cursorX=null,playing=false,raf=0,t0=0;
+const cursorPlugin={id:"cursor",afterDatasetsDraw(ch){
+  if(cursorX==null)return;const x=ch.scales.x.getPixelForValue(cursorX),a=ch.chartArea;
+  if(x<a.left||x>a.right)return;const c=ch.ctx;c.save();c.strokeStyle=css("--ink");c.globalAlpha=.5;c.lineWidth=1;
+  c.setLineDash([3,3]);c.beginPath();c.moveTo(x,a.top);c.lineTo(x,a.bottom);c.stroke();c.restore();}};
+
+function draw(){
+  const p=params();ids.forEach(k=>$("o-"+k).textContent=fmt[k](p[k]));
+  const th=vthT(p),sim=simulate(p),ceil=ceiling(p),o=sim.o;
+  const red=css("--red"),teal=css("--teal"),navy=css("--navy"),amber=css("--amber"),muted=css("--muted"),grid=css("--grid");
+
+  $("r-ratio").textContent=(p.crss/(p.ciss+p.cgx)*100).toFixed(2)+" %";
+  $("r-ceil").textContent=`ceiling ${(p.voff+ceil).toFixed(2)} V`;
+  $("r-peak").textContent=sim.peak.toFixed(2)+" V";
+  $("r-vth").textContent=`V_th at ${p.tj} °C = ${th.toFixed(2)} V`;
+  $("r-ipk").textContent=sim.ipk.toFixed(sim.ipk<10?2:1)+" A";
+  $("r-ton").textContent=sim.ton>0?`for ${(sim.ton*1e9).toFixed(1)} ns`:"none";
+  const loss=sim.E*p.fsw*1e3;
+  $("r-p").textContent=loss>=1?loss.toFixed(2)+" W":(loss*1e3).toFixed(0)+" mW";
+  $("r-e").textContent=`${(sim.E*1e6).toFixed(2)} µJ/edge at ${p.fsw} kHz`;
+  const hot=sim.ipk>0;["r-peak","r-ipk","r-p"].forEach(k=>$(k).style.color=hot?red:"");
+
+  const margin=th-sim.peak;let cls,lab,txt;
+  if(hot){cls="bad";lab="Self turn-on";txt=`Gate overshoots V_th by ${(-margin).toFixed(2)} V. Lower R_G,off or add negative bias.`;}
+  else if(margin<0.5){cls="warn";lab="Marginal";txt=`Only ${margin.toFixed(2)} V below V_th. V_th spread can close this gap.`;}
+  else{cls="ok";lab="Safe";txt=p.voff+ceil<th?"Ceiling is below V_th: immune at any dV/dt.":`${margin.toFixed(2)} V of margin, held by the gate driver.`;}
+  $("pill").className="pill "+cls;$("pill").textContent=lab;$("vtext").textContent=txt;
+
+  renderCalc(p,sim,th,loss);
+  const trNs=sim.tr*1e9,pre=-0.15*trNs,tEnd=o.t[o.t.length-1];
+  const s=arr=>[{x:pre,y:arr[0]}].concat(o.t.map((t,i)=>({x:t,y:arr[i]})));
+  const ax=(title,color,w,extra)=>Object.assign({stack:"s",stackWeight:w,offset:true,title:{display:true,text:title,color},ticks:{color:muted,maxTicksLimit:4},grid:{color:grid}},extra);
+  const opts={responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${(+c.parsed.y).toFixed(c.dataset.yAxisID==="ySW"?1:2)} ${c.dataset.yAxisID==="yID"?"A":"V"}`}}},
+    scales:{x:{type:"linear",min:pre,max:tEnd,title:{display:true,text:"time (ns)",color:muted},ticks:{color:muted,maxTicksLimit:8,callback:v=>+(+v).toPrecision(3)},grid:{color:grid}},
+      ySW:ax("SW node (V)",navy,1.6,{min:-0.08*p.vbus,max:p.vbus*1.12,afterBuildTicks:a=>{a.ticks=[{value:0},{value:p.vbus/2},{value:p.vbus}]}}),
+      yGS:ax("V_GS Q_L (V)",hot?red:teal,1.4,{suggestedMin:Math.min(p.voff,0)-0.3,suggestedMax:Math.max(sim.peak,th)+0.5}),
+      yID:ax("I_D (A)",red,1.1,{min:0,suggestedMax:Math.max(1,sim.ipk*1.15)})}};
+  const ds=[
+    {label:"SW node",data:s(o.vd),borderColor:navy,borderWidth:2.2,pointRadius:0,yAxisID:"ySW"},
+    {label:"V_GS(Q_L)",data:s(o.vg),borderColor:hot?red:teal,borderWidth:2,pointRadius:0,yAxisID:"yGS"},
+    {label:"V_th",data:[{x:pre,y:th},{x:tEnd,y:th}],borderColor:amber,borderDash:[6,4],borderWidth:1.4,pointRadius:0,yAxisID:"yGS"},
+    {label:"Shoot-through",data:s(o.id),borderColor:red,backgroundColor:"rgba(194,65,45,.18)",fill:"origin",borderWidth:2,pointRadius:0,yAxisID:"yID"}];
+  if(cW){cW.data.datasets=ds;cW.options=opts;cW.update();}else cW=new Chart($("cSw"),{type:"line",data:{datasets:ds},options:opts,plugins:[cursorPlugin]});
+  last={p,sim,th};setCursor(cursorIdx);
+}
+
+function renderCalc(p,sim,th,loss){
+  const ov=sim.peak-th, hot=sim.ipk>0, tonNs=sim.ton*1e9;
+  const tri=0.5*sim.ipk*sim.vdPk*sim.ton;
+  const uJ=e=>(e*1e6).toFixed(2)+" µJ", W=w=>w>=1?w.toFixed(2)+" W":(w*1e3).toFixed(0)+" mW";
+  const steps=[
+    ["1 · Gate overshoot","V_GS,pk − V_th",`${sim.peak.toFixed(2)} − ${th.toFixed(2)}`,hot?`${ov.toFixed(2)} V`:"none",hot?"How far the Miller bump crosses threshold.":`Gate stays ${(-ov).toFixed(2)} V below V_th.`],
+    ["2 · Shoot-through current","I_D = g_fs × (V_GS − V_th)",hot?`${p.gfs} S × ${ov.toFixed(2)} V`:`${p.gfs} S × 0`,`${sim.ipk.toFixed(1)} A peak`,hot?`Flows for about ${tonNs.toFixed(1)} ns while both switches conduct.`:"Channel stays off."],
+    ["3 · Energy per edge","E = ∫ V_DS·I_D dt ≈ ½·I_pk·V_DS·t_on",hot?`½ × ${sim.ipk.toFixed(1)} A × ${sim.vdPk.toFixed(0)} V × ${tonNs.toFixed(1)} ns`:"0",uJ(sim.E),hot?`Hand estimate ${uJ(tri)}; the value shown is the exact integral.`:"No energy dumped."],
+    ["4 · Extra loss","P = E × f_sw",hot?`${uJ(sim.E)} × ${p.fsw} kHz`:`0 × ${p.fsw} kHz`,W(loss),"Per device, per edge each cycle. Not in the R_DS(on) or switching-loss budget."]];
+  $("calc").innerHTML=steps.map(s=>`<div class="step"><span class="n">${s[0]}</span><span class="eqn">${s[1]}</span><span class="eqn" style="color:var(--ink)">= ${s[2]}</span><span class="res">${s[3]}</span><span class="why">${s[4]}</span></div>`).join("");
+  document.querySelector(".calc").classList.toggle("hot",hot);
+  $("calc-note").textContent=hot
+    ?`A ${ov.toFixed(2)} V overshoot costs ${W(loss)} per device. g_fs and f_sw are under Advanced. Multiply by the number of devices that see this edge (parallel SRs, full bridge).`
+    :"No self turn-on, so no extra loss. Raise R_G,off or dV/dt to see the calculation fill in.";
+}
+
+function setCursor(k){
+  if(!last)return;const o=last.sim.o,n=o.t.length-1;cursorIdx=Math.max(0,Math.min(n,k));
+  const i=cursorIdx,p=last.p,th=last.th,vg=o.vg[i],vd=o.vd[i],id=o.id[i];
+  cursorX=o.t[i];$("scrub").value=Math.round(i/n*1000);
+  const ink=css("--ink"),tl=css("--teal"),rd=css("--red"),mu=css("--muted");
+  const lo=Math.min(p.voff,-0.5)-0.5,hi=Math.max(last.sim.peak,th,1)+1,sc=v=>190-(v-lo)/(hi-lo)*160;
+  const yg=sc(vg);$("hb-g").setAttribute("y",yg);$("hb-g").setAttribute("height",Math.max(0,sc(lo)-yg));
+  $("hb-g").setAttribute("fill",vg>th?rd:tl);
+  const yt=sc(th);$("hb-vth").setAttribute("y1",yt);$("hb-vth").setAttribute("y2",yt);$("hb-vth-t").setAttribute("y",yt+4);
+  $("hb-g-t").textContent=vg.toFixed(2)+" V";
+  const ramping=i>0&&o.t[i]<last.sim.tr*1e9,qhOn=vd>=p.vbus-0.01;
+  $("qh-ch").setAttribute("stroke",ramping||qhOn?tl:ink);$("qh-s").textContent=qhOn?"on":(ramping?"turning on":"off");
+  $("ql-ch").setAttribute("stroke",id>0?rd:ink);$("ql-s").textContent=id>0?`ON · ${id.toFixed(1)} A`:"off";$("ql-s").style.fill=id>0?rd:"";
+  [["ql-cgd"],["ql-cds"]].forEach(([k])=>{$(k).setAttribute("stroke",ramping?tl:mu);$(k).setAttribute("stroke-width",ramping?2.2:1.4);});
+  $("hb-mi").setAttribute("opacity",ramping?1:0);
+  const frac=id/Math.max(last.sim.ipk,1e-9),st=$("hb-st");
+  st.setAttribute("stroke-width",id>0?(2+8*frac).toFixed(1):0);st.setAttribute("opacity",id>0?.85:0);st.classList.toggle("run",id>0&&playing);
+  $("now").innerHTML=`t ${o.t[i].toFixed(1)} ns · SW ${vd.toFixed(1)} V · V_GS ${vg.toFixed(2)} V · I_D ${id>0?`<b>${id.toFixed(2)} A</b>`:"0 A"}`;
+  if(cW)cW.draw();
+}
+function tick(ts){if(!playing)return;const n=last.sim.o.t.length-1,f=Math.min(1,(ts-t0)/5000);setCursor(Math.round(f*n));if(f<1)raf=requestAnimationFrame(tick);else stopPlay();}
+function stopPlay(){playing=false;cancelAnimationFrame(raf);$("play").textContent="▶ Play";$("play").classList.remove("on");$("hb-st").classList.remove("run");}
+$("play").addEventListener("click",()=>{
+  if(playing){stopPlay();return;}
+  const n=last.sim.o.t.length-1;if(cursorIdx>=n)setCursor(0);
+  playing=true;$("play").textContent="❚❚ Pause";$("play").classList.add("on");t0=performance.now()-cursorIdx/n*5000;raf=requestAnimationFrame(tick);
+});
+$("scrub").addEventListener("input",e=>{stopPlay();setCursor(Math.round(e.target.value/1000*(last.sim.o.t.length-1)));});
+
+function load(name){const p=PRESETS[name];ids.forEach(k=>$(k).value=p[k]);$("clamp").checked=false;
+  document.querySelectorAll("#presets button").forEach(b=>b.classList.toggle("on",b.dataset.n===name));stopPlay();cursorIdx=0;draw();}
+Object.keys(PRESETS).forEach(n=>{const b=document.createElement("button");b.type="button";b.textContent=n;b.dataset.n=n;b.onclick=()=>load(n);$("presets").appendChild(b);});
+ids.forEach(k=>$(k).addEventListener("input",()=>{document.querySelectorAll("#presets button").forEach(b=>b.classList.remove("on"));draw();}));
+$("clamp").addEventListener("change",draw);
+const rerender=()=>{if(cW){cW.destroy();cW=null}draw();};
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",rerender);
+new MutationObserver(rerender).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+load("SR self turn-on");
+</script>
+
+</body>
+</html>
